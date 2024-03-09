@@ -1,44 +1,43 @@
-﻿namespace AudioSwitcher.AudioApi.Tests.Stubs
+﻿namespace AudioSwitcher.AudioApi.Tests.Stubs;
+
+public abstract class DeviceStub : Device
 {
-    public abstract class DeviceStub : Device
+    public DeviceStub() : base(null)
     {
-        public DeviceStub() : base(null)
-        {
-        }
+    }
 
-        internal void Dispose()
-        {
-            base.Dispose(true);
-        }
+    public void FireDefaultChanged()
+    {
+        OnDefaultChanged();
+    }
 
-        public void FirePropertyChanged(string name)
-        {
-            OnPropertyChanged(name);
-        }
+    public void FireMuteChanged(bool mute)
+    {
+        OnMuteChanged(mute);
+    }
 
-        public void FireVolumeChanged(double volume)
-        {
-            OnVolumeChanged(volume);
-        }
+    public void FirePeakChanged(double volume)
+    {
+        OnPeakValueChanged(volume);
+    }
 
-        public void FireMuteChanged(bool mute)
-        {
-            OnMuteChanged(mute);
-        }
+    public void FirePropertyChanged(string name)
+    {
+        OnPropertyChanged(name);
+    }
 
-        public void FirePeakChanged(double volume)
-        {
-            OnPeakValueChanged(volume);
-        }
+    public void FireStateChanged(DeviceState state)
+    {
+        OnStateChanged(state);
+    }
 
-        public void FireDefaultChanged()
-        {
-            OnDefaultChanged();
-        }
+    public void FireVolumeChanged(double volume)
+    {
+        OnVolumeChanged(volume);
+    }
 
-        public void FireStateChanged(DeviceState state)
-        {
-            OnStateChanged(state);
-        }
+    internal void Dispose()
+    {
+        base.Dispose(true);
     }
 }

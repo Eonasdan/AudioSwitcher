@@ -1,12 +1,10 @@
-﻿namespace AudioSwitcher.AudioApi.Capabilities
+﻿namespace AudioSwitcher.AudioApi.Capabilities;
+
+public interface IMicrophoneBoost : IDeviceCapability
 {
-    public interface IMicrophoneBoost : IDeviceCapability
-    {
-        int Level { get; }
+    int Level { get; }
 
-        bool IsValidLevel(int level);
+    int[] GetValidLevels();
 
-        int[] GetValidLevels();
-
-    }
+    bool IsValidLevel(int level);
 }

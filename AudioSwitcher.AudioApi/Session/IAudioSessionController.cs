@@ -2,44 +2,43 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
-namespace AudioSwitcher.AudioApi.Session
+namespace AudioSwitcher.AudioApi.Session;
+
+public interface IAudioSessionController : IDeviceCapability, IEnumerable<IAudioSession>
 {
-    public interface IAudioSessionController : IDeviceCapability, IEnumerable<IAudioSession>
-    {
-        IObservable<IAudioSession> SessionCreated { get; }
+    IObservable<IAudioSession> SessionCreated { get; }
 
-        IObservable<string> SessionDisconnected { get; }
+    IObservable<string> SessionDisconnected { get; }
 
-        /// <summary>
-        /// All audio sessions
-        /// </summary>
-        /// <returns></returns>
-        IEnumerable<IAudioSession> All();
+    /// <summary>
+    /// All active audio sessions
+    /// </summary>
+    /// <returns></returns>
+    IEnumerable<IAudioSession> ActiveSessions();
 
-        Task<IEnumerable<IAudioSession>> AllAsync();
+    Task<IEnumerable<IAudioSession>> ActiveSessionsAsync();
 
-        /// <summary>
-        /// All active audio sessions
-        /// </summary>
-        /// <returns></returns>
-        IEnumerable<IAudioSession> ActiveSessions();
+    /// <summary>
+    /// All audio sessions
+    /// </summary>
+    /// <returns></returns>
+    IEnumerable<IAudioSession> All();
 
-        Task<IEnumerable<IAudioSession>> ActiveSessionsAsync();
+    Task<IEnumerable<IAudioSession>> AllAsync();
 
-        /// <summary>
-        /// All inactive audio sessions
-        /// </summary>
-        /// <returns></returns>
-        IEnumerable<IAudioSession> InactiveSessions();
+    /// <summary>
+    /// All expired audio sessions
+    /// </summary>
+    /// <returns></returns>
+    IEnumerable<IAudioSession> ExpiredSessions();
 
-        Task<IEnumerable<IAudioSession>> InactiveSessionsAsync();
+    Task<IEnumerable<IAudioSession>> ExpiredSessionsAsync();
 
-        /// <summary>
-        /// All expired audio sessions
-        /// </summary>
-        /// <returns></returns>
-        IEnumerable<IAudioSession> ExpiredSessions();
+    /// <summary>
+    /// All inactive audio sessions
+    /// </summary>
+    /// <returns></returns>
+    IEnumerable<IAudioSession> InactiveSessions();
 
-        Task<IEnumerable<IAudioSession>> ExpiredSessionsAsync();
-    }
+    Task<IEnumerable<IAudioSession>> InactiveSessionsAsync();
 }

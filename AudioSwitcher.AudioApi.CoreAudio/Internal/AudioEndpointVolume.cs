@@ -25,177 +25,165 @@ using System.Runtime.InteropServices;
 using AudioSwitcher.AudioApi.CoreAudio.Interfaces;
 using AudioSwitcher.AudioApi.CoreAudio.Threading;
 
-namespace AudioSwitcher.AudioApi.CoreAudio
+namespace AudioSwitcher.AudioApi.CoreAudio;
+
+internal delegate void AudioEndpointVolumeNotificationDelegate(AudioVolumeNotificationData data);
+
+internal class AudioEndpointVolume : IDisposable
 {
+    private IAudioEndpointVolume _audioEndPointVolume;
+    private AudioEndpointVolumeCallback _callBack;
 
-    internal delegate void AudioEndpointVolumeNotificationDelegate(AudioVolumeNotificationData data);
-
-    internal class AudioEndpointVolume : IDisposable
+    /// <summary>
+    /// Creates a new Audio endpoint volume
+    /// </summary>
+    /// <param name="realEndpointVolume">IAudioEndpointVolume COM interface</param>
+    internal AudioEndpointVolume(IAudioEndpointVolume realEndpointVolume)
     {
-        private readonly AudioEndpointVolumeChannels _channels;
-        private readonly EndpointHardwareSupport _hardwareSupport;
-        private readonly AudioEndpointVolumeStepInformation _stepInformation;
-        private readonly AudioEndpointVolumeVolumeRange _volumeRange;
-        private IAudioEndpointVolume _audioEndPointVolume;
-        private AudioEndpointVolumeCallback _callBack;
+        ComThread.Assert();
 
-        /// <summary>
-        ///     VolumeChanged Range
-        /// </summary>
-        public AudioEndpointVolumeVolumeRange VolumeRange => _volumeRange;
+        _audioEndPointVolume = realEndpointVolume;
+        Channels = new AudioEndpointVolumeChannels(_audioEndPointVolume);
+        StepInformation = new AudioEndpointVolumeStepInformation(_audioEndPointVolume);
+        Marshal.ThrowExceptionForHR(_audioEndPointVolume.QueryHardwareSupport(out var hardwareSupp));
+        HardwareSupport = (EndpointHardwareSupport)hardwareSupp;
+        VolumeRange = new AudioEndpointVolumeVolumeRange(_audioEndPointVolume);
 
-        /// <summary>
-        ///     Hardware Support
-        /// </summary>
-        public EndpointHardwareSupport HardwareSupport => _hardwareSupport;
+        _callBack = new AudioEndpointVolumeCallback(this);
+        Marshal.ThrowExceptionForHR(_audioEndPointVolume.RegisterControlChangeNotify(_callBack));
+    }
 
-        /// <summary>
-        ///     Step Information
-        /// </summary>
-        public AudioEndpointVolumeStepInformation StepInformation => _stepInformation;
+    /// <summary>
+    /// VolumeChanged Range
+    /// </summary>
+    public AudioEndpointVolumeVolumeRange VolumeRange { get; }
 
-        /// <summary>
-        ///     Channels
-        /// </summary>
-        public AudioEndpointVolumeChannels Channels => _channels;
+    /// <summary>
+    /// Hardware Support
+    /// </summary>
+    public EndpointHardwareSupport HardwareSupport { get; }
 
-        /// <summary>
-        ///     Master VolumeChanged Level
-        /// </summary>
-        public float MasterVolumeLevel
+    /// <summary>
+    /// Step Information
+    /// </summary>
+    public AudioEndpointVolumeStepInformation StepInformation { get; }
+
+    /// <summary>
+    /// Channels
+    /// </summary>
+    public AudioEndpointVolumeChannels Channels { get; }
+
+    /// <summary>
+    /// Master VolumeChanged Level
+    /// </summary>
+    public float MasterVolumeLevel
+    {
+        get
         {
-            get
+            return ComThread.Invoke(() =>
             {
-                return ComThread.Invoke(() =>
-                {
-                    float result;
-                    Marshal.ThrowExceptionForHR(_audioEndPointVolume.GetMasterVolumeLevel(out result));
-                    return result;
-                });
-            }
-            set
+                Marshal.ThrowExceptionForHR(_audioEndPointVolume.GetMasterVolumeLevel(out var result));
+                return result;
+            });
+        }
+        set
+        {
+            ComThread.Invoke(() =>
             {
-                ComThread.Invoke(() =>
-                {
-                    Marshal.ThrowExceptionForHR(_audioEndPointVolume.SetMasterVolumeLevel(value, Guid.Empty));
-                });
-            }
+                Marshal.ThrowExceptionForHR(_audioEndPointVolume.SetMasterVolumeLevel(value, Guid.Empty));
+            });
         }
+    }
 
-        /// <summary>
-        ///     Master VolumeChanged Level Scalar
-        /// </summary>
-        public float MasterVolumeLevelScalar
+    /// <summary>
+    /// Master VolumeChanged Level Scalar
+    /// </summary>
+    public float MasterVolumeLevelScalar
+    {
+        get
         {
-            get
+            return ComThread.Invoke(() =>
             {
-                return ComThread.Invoke(() =>
-                {
-                    float result;
-                    Marshal.ThrowExceptionForHR(_audioEndPointVolume.GetMasterVolumeLevelScalar(out result));
-                    return result;
-                });
-            }
-            set
+                Marshal.ThrowExceptionForHR(_audioEndPointVolume.GetMasterVolumeLevelScalar(out var result));
+                return result;
+            });
+        }
+        set
+        {
+            ComThread.BeginInvoke(() =>
             {
-                ComThread.BeginInvoke(() =>
-                {
-                    Marshal.ThrowExceptionForHR(_audioEndPointVolume.SetMasterVolumeLevelScalar(value, Guid.Empty));
-                });
-            }
+                Marshal.ThrowExceptionForHR(_audioEndPointVolume.SetMasterVolumeLevelScalar(value, Guid.Empty));
+            });
         }
+    }
 
-        /// <summary>
-        ///     Mute
-        /// </summary>
-        public bool Mute
+    /// <summary>
+    /// Mute
+    /// </summary>
+    public bool Mute
+    {
+        get
         {
-            get
+            return ComThread.Invoke(() =>
             {
-                return ComThread.Invoke(() =>
-                {
-                    bool result;
-                    Marshal.ThrowExceptionForHR(_audioEndPointVolume.GetMute(out result));
-                    return result;
-                });
-            }
-            set
+                Marshal.ThrowExceptionForHR(_audioEndPointVolume.GetMute(out var result));
+                return result;
+            });
+        }
+        set
+        {
+            ComThread.BeginInvoke(() => Marshal.ThrowExceptionForHR(_audioEndPointVolume.SetMute(value, Guid.Empty)));
+        }
+    }
+
+    /// <summary>
+    /// Dispose
+    /// </summary>
+    public void Dispose()
+    {
+        if (_callBack != null)
+            ComThread.BeginInvoke(() =>
             {
-                ComThread.BeginInvoke(() => Marshal.ThrowExceptionForHR(_audioEndPointVolume.SetMute(value, Guid.Empty)));
-            }
-        }
+                _audioEndPointVolume?.UnregisterControlChangeNotify(_callBack);
 
-        /// <summary>
-        ///     Creates a new Audio endpoint volume
-        /// </summary>
-        /// <param name="realEndpointVolume">IAudioEndpointVolume COM interface</param>
-        internal AudioEndpointVolume(IAudioEndpointVolume realEndpointVolume)
-        {
-            ComThread.Assert();
-            uint hardwareSupp;
+                _callBack = null;
+                _audioEndPointVolume = null;
+            });
 
-            _audioEndPointVolume = realEndpointVolume;
-            _channels = new AudioEndpointVolumeChannels(_audioEndPointVolume);
-            _stepInformation = new AudioEndpointVolumeStepInformation(_audioEndPointVolume);
-            Marshal.ThrowExceptionForHR(_audioEndPointVolume.QueryHardwareSupport(out hardwareSupp));
-            _hardwareSupport = (EndpointHardwareSupport)hardwareSupp;
-            _volumeRange = new AudioEndpointVolumeVolumeRange(_audioEndPointVolume);
+        GC.SuppressFinalize(this);
+    }
 
-            _callBack = new AudioEndpointVolumeCallback(this);
-            Marshal.ThrowExceptionForHR(_audioEndPointVolume.RegisterControlChangeNotify(_callBack));
-        }
+    /// <summary>
+    /// On VolumeChanged Notification
+    /// </summary>
+    public event AudioEndpointVolumeNotificationDelegate OnVolumeNotification;
 
-        /// <summary>
-        ///     Dispose
-        /// </summary>
-        public void Dispose()
-        {
-            if (_callBack != null)
-            {
-                ComThread.BeginInvoke(() =>
-                {
-                    _audioEndPointVolume?.UnregisterControlChangeNotify(_callBack);
+    /// <summary>
+    /// VolumeChanged Step Down
+    /// </summary>
+    public void VolumeStepDown()
+    {
+        ComThread.Invoke(() => Marshal.ThrowExceptionForHR(_audioEndPointVolume.VolumeStepDown(Guid.Empty)));
+    }
 
-                    _callBack = null;
-                    _audioEndPointVolume = null;
-                });
-            }
+    /// <summary>
+    /// VolumeChanged Step Up
+    /// </summary>
+    public void VolumeStepUp()
+    {
+        ComThread.Invoke(() => Marshal.ThrowExceptionForHR(_audioEndPointVolume.VolumeStepUp(Guid.Empty)));
+    }
 
-            GC.SuppressFinalize(this);
-        }
+    internal void FireNotification(AudioVolumeNotificationData notificationData)
+    {
+        OnVolumeNotification?.Invoke(notificationData);
+    }
 
-        /// <summary>
-        ///     On VolumeChanged Notification
-        /// </summary>
-        public event AudioEndpointVolumeNotificationDelegate OnVolumeNotification;
-
-        /// <summary>
-        ///     VolumeChanged Step Up
-        /// </summary>
-        public void VolumeStepUp()
-        {
-            ComThread.Invoke(() => Marshal.ThrowExceptionForHR(_audioEndPointVolume.VolumeStepUp(Guid.Empty)));
-        }
-
-        /// <summary>
-        ///     VolumeChanged Step Down
-        /// </summary>
-        public void VolumeStepDown()
-        {
-            ComThread.Invoke(() => Marshal.ThrowExceptionForHR(_audioEndPointVolume.VolumeStepDown(Guid.Empty)));
-        }
-
-        internal void FireNotification(AudioVolumeNotificationData notificationData)
-        {
-            OnVolumeNotification?.Invoke(notificationData);
-        }
-
-        /// <summary>
-        ///     Finalizer
-        /// </summary>
-        ~AudioEndpointVolume()
-        {
-            Dispose();
-        }
+    /// <summary>
+    /// Finalizer
+    /// </summary>
+    ~AudioEndpointVolume()
+    {
+        Dispose();
     }
 }

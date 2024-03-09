@@ -3,381 +3,377 @@ using System.Threading;
 using AudioSwitcher.AudioApi.Observables;
 using Xunit;
 
-namespace AudioSwitcher.AudioApi.Tests
+namespace AudioSwitcher.AudioApi.Tests;
+
+public class AsyncBroadcasterTests
 {
-    public class AsyncBroadcasterTests
+    [Fact]
+    public void AsyncBroadcaster_Completed_Subscribe_Does_Not_Add_Observer()
     {
-        [Fact]
-        public void AsyncBroadcaster_Empty()
+        var b = new AsyncBroadcaster<int>();
+        b.OnCompleted();
+
+        b.Subscribe(x => { });
+
+        Assert.True(b.IsComplete);
+        Assert.False(b.HasObservers);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_Dispose()
+    {
+        var b = new AsyncBroadcaster<int>();
+        b.Dispose();
+        Assert.True(b.IsDisposed);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_Dispose_Does_Not_Fire_OnCompleted()
+    {
+        var b = new AsyncBroadcaster<int>();
+        var resetEvent = new ManualResetEvent(false);
+
+        var count = 0;
+
+        var sub = b.Subscribe(x => { }, () =>
         {
-            var b = new AsyncBroadcaster<int>();
+            count++;
+            resetEvent.Set();
+        });
 
-            Assert.False(b.IsDisposed);
-            Assert.False(b.HasObservers);
-        }
+        Assert.NotNull(sub);
 
-        [Fact]
-        public void AsyncBroadcaster_Dispose()
+        //Dispose will call complete once
+        b.Dispose();
+        resetEvent.WaitOne();
+
+        //ensure it's not called again
+        resetEvent.Reset();
+        b.OnCompleted();
+        resetEvent.WaitOne(200);
+
+        Assert.Equal(1, count);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_Disposed_Does_Not_Fire_OnError()
+    {
+        var b = new AsyncBroadcaster<int>();
+        var resetEvent = new ManualResetEvent(false);
+
+        var exception = new Exception("HAI");
+        Exception result = null;
+
+        var sub = b.Subscribe(x => { }, x => { result = x; });
+
+        Assert.NotNull(sub);
+
+        b.Dispose();
+        resetEvent.WaitOne(200);
+
+        b.OnError(exception);
+        resetEvent.WaitOne(200);
+
+        Assert.Null(result);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_Disposed_Does_Not_Fire_OnNext()
+    {
+        var b = new AsyncBroadcaster<int>();
+
+        var result = -1;
+
+        var sub = b.Subscribe(x => { result = x; });
+
+        Assert.NotNull(sub);
+
+        b.Dispose();
+        b.OnNext(2);
+
+        Assert.NotEqual(2, result);
+        Assert.Equal(-1, result);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_Disposed_HasObservers()
+    {
+        var b = new AsyncBroadcaster<int>();
+
+        var sub = b.Subscribe(x => { });
+
+        Assert.NotNull(sub);
+
+        b.Dispose();
+
+        Assert.False(b.HasObservers);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_Disposed_OnCompleted()
+    {
+        var b = new AsyncBroadcaster<int>();
+        var resetEvent = new ManualResetEvent(false);
+
+        var complete = false;
+
+        var sub = b.Subscribe(x => { }, () =>
         {
-            var b = new AsyncBroadcaster<int>();
-            b.Dispose();
-            Assert.True(b.IsDisposed);
-        }
+            complete = true;
+            resetEvent.Set();
+        });
 
-        [Fact]
-        public void AsyncBroacaster_Disposed_HasObservers()
+        Assert.NotNull(sub);
+
+        b.Dispose();
+        resetEvent.WaitOne();
+
+        Assert.True(complete);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_Disposed_OnNext()
+    {
+        var b = new AsyncBroadcaster<int>();
+
+        var result = -1;
+
+        var sub = b.Subscribe(x => { result = x; });
+
+        Assert.NotNull(sub);
+        sub.Dispose();
+
+        b.Dispose();
+
+        b.OnNext(2);
+
+        Assert.NotEqual(2, result);
+        Assert.Equal(-1, result);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_Disposed_Subscribe_Throws_Exception()
+    {
+        var b = new AsyncBroadcaster<int>();
+        b.Dispose();
+
+        Assert.True(b.IsComplete);
+        Assert.True(b.IsDisposed);
+
+        Assert.Throws<ObjectDisposedException>(() => b.Subscribe(x => { }));
+
+        Assert.False(b.HasObservers);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_DisposedSubscription_OnCompleted()
+    {
+        var b = new AsyncBroadcaster<int>();
+        var resetEvent = new ManualResetEvent(false);
+
+        var complete = false;
+
+        var sub = b.Subscribe(x => { }, () =>
         {
-            var b = new AsyncBroadcaster<int>();
+            complete = true;
+            resetEvent.Set();
+        });
 
-            var sub = b.Subscribe(x => { });
+        Assert.NotNull(sub);
 
-            Assert.NotNull(sub);
+        sub.Dispose();
+        resetEvent.WaitOne(200);
 
-            b.Dispose();
+        //disposing sub should not fire on completed
+        Assert.False(complete);
+    }
 
-            Assert.False(b.HasObservers);
-        }
+    [Fact]
+    public void AsyncBroadcaster_DisposedSubscription_OnNext()
+    {
+        var b = new AsyncBroadcaster<int>();
 
-        [Fact]
-        public void AsyncBroacaster_SubscriptionDisposed_HasObservers()
+        var result = -1;
+
+        var sub = b.Subscribe(x => { result = x; });
+
+        Assert.NotNull(sub);
+        sub.Dispose();
+
+        b.OnNext(2);
+
+        Assert.NotEqual(2, result);
+        Assert.Equal(-1, result);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_Empty()
+    {
+        var b = new AsyncBroadcaster<int>();
+
+        Assert.False(b.IsDisposed);
+        Assert.False(b.HasObservers);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_OnCompleted()
+    {
+        var b = new AsyncBroadcaster<int>();
+        var resetEvent = new ManualResetEvent(false);
+
+        var complete = false;
+
+        var sub = b.Subscribe(x => { }, () =>
         {
-            var b = new AsyncBroadcaster<int>();
+            complete = true;
+            resetEvent.Set();
+        });
 
-            var sub = b.Subscribe(x => { });
+        Assert.NotNull(sub);
 
-            Assert.NotNull(sub);
+        b.OnCompleted();
+        resetEvent.WaitOne();
 
-            sub.Dispose();
+        Assert.True(complete);
+    }
 
-            Assert.False(b.HasObservers);
-        }
+    [Fact]
+    public void AsyncBroadcaster_OnError_FromOnError()
+    {
+        var b = new AsyncBroadcaster<int>();
+        var resetEvent = new ManualResetEvent(false);
 
-        [Fact]
-        public void AsyncBroacaster_Subscribe()
+        var exception = new Exception("HAI");
+        Exception result = null;
+
+        var sub = b.Subscribe(x => { }, x =>
         {
-            var b = new AsyncBroadcaster<int>();
+            result = x;
+            resetEvent.Set();
+        });
 
-            var sub = b.Subscribe(x => { });
+        Assert.NotNull(sub);
 
-            Assert.NotNull(sub);
-        }
+        b.OnError(exception);
+        resetEvent.WaitOne();
 
-        [Fact]
-        public void AsyncBroacaster_Subscribe_HasObservers()
+        Assert.NotNull(result);
+
+        Assert.Equal(exception, result);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_OnError_FromOnNext()
+    {
+        var b = new AsyncBroadcaster<int>();
+        var resetEvent = new ManualResetEvent(false);
+
+        var exception = new Exception("HAI");
+        Exception result = null;
+
+        var sub = b.Subscribe(x => { throw exception; }, x =>
         {
-            var b = new AsyncBroadcaster<int>();
+            result = x;
+            resetEvent.Set();
+        });
 
-            var sub = b.Subscribe(x => { });
+        Assert.NotNull(sub);
 
-            Assert.NotNull(sub);
+        b.OnNext(1);
+        resetEvent.WaitOne();
 
-            Assert.True(b.HasObservers);
-        }
+        Assert.NotNull(result);
 
-        [Fact]
-        public void AsyncBroacaster_OnNext()
+        Assert.Equal(exception, result);
+    }
+
+    [Fact]
+    public void AsyncBroadcaster_OnNext()
+    {
+        var b = new AsyncBroadcaster<int>();
+        var resetEvent = new ManualResetEvent(false);
+
+        var result = -1;
+
+        var sub = b.Subscribe(x =>
         {
-            var b = new AsyncBroadcaster<int>();
-            var resetEvent = new ManualResetEvent(false);
+            result = x;
+            resetEvent.Set();
+        });
 
-            int result = -1;
+        Assert.NotNull(sub);
 
-            var sub = b.Subscribe(x =>
-            {
-                result = x;
-                resetEvent.Set();
-            });
+        b.OnNext(2);
+        resetEvent.WaitOne();
 
-            Assert.NotNull(sub);
+        Assert.NotEqual(-1, result);
+        Assert.Equal(2, result);
+    }
 
-            b.OnNext(2);
-            resetEvent.WaitOne();
+    [Fact]
+    public void AsyncBroadcaster_Subscribe()
+    {
+        var b = new AsyncBroadcaster<int>();
 
-            Assert.NotEqual(-1, result);
-            Assert.Equal(2, result);
-        }
+        var sub = b.Subscribe(x => { });
 
-        [Fact]
-        public void AsyncBroacaster_Subscribe_SubscriptionDispose()
-        {
-            var b = new AsyncBroadcaster<int>();
+        Assert.NotNull(sub);
+    }
 
-            var sub = b.Subscribe(x => { });
+    [Fact]
+    public void AsyncBroadcaster_Subscribe_HasObservers()
+    {
+        var b = new AsyncBroadcaster<int>();
 
-            Assert.NotNull(sub);
+        var sub = b.Subscribe(x => { });
 
-            Assert.True(b.HasObservers);
+        Assert.NotNull(sub);
 
-            sub.Dispose();
+        Assert.True(b.HasObservers);
+    }
 
-            Assert.False(b.HasObservers);
-        }
+    [Fact]
+    public void AsyncBroadcaster_Subscribe_SubscriptionDispose()
+    {
+        var b = new AsyncBroadcaster<int>();
 
-        [Fact]
-        public void AsyncBroacaster_DisposedSubscription_OnNext()
-        {
-            var b = new AsyncBroadcaster<int>();
+        var sub = b.Subscribe(x => { });
 
-            int result = -1;
+        Assert.NotNull(sub);
 
-            var sub = b.Subscribe(x => { result = x; });
+        Assert.True(b.HasObservers);
 
-            Assert.NotNull(sub);
-            sub.Dispose();
+        sub.Dispose();
 
-            b.OnNext(2);
+        Assert.False(b.HasObservers);
+    }
 
-            Assert.NotEqual(2, result);
-            Assert.Equal(-1, result);
-        }
+    [Fact]
+    public void AsyncBroadcaster_SubscriptionDisposed_HasObservers()
+    {
+        var b = new AsyncBroadcaster<int>();
 
-        [Fact]
-        public void AsyncBroacaster_Disposed_OnNext()
-        {
-            var b = new AsyncBroadcaster<int>();
+        var sub = b.Subscribe(x => { });
 
-            int result = -1;
+        Assert.NotNull(sub);
 
-            var sub = b.Subscribe(x => { result = x; });
+        sub.Dispose();
 
-            Assert.NotNull(sub);
-            sub.Dispose();
+        Assert.False(b.HasObservers);
+    }
 
-            b.Dispose();
 
-            b.OnNext(2);
+    [Fact]
+    public void DelegateDisposable_Create()
+    {
+        var count = 0;
+        var disposable = new DelegateDisposable(() => count = 1);
 
-            Assert.NotEqual(2, result);
-            Assert.Equal(-1, result);
-        }
+        Assert.NotNull(disposable);
+        Assert.IsAssignableFrom<IDisposable>(disposable);
 
-        [Fact]
-        public void AsyncBroacaster_Disposed_Does_Not_Fire_OnNext()
-        {
-            var b = new AsyncBroadcaster<int>();
+        disposable.Dispose();
 
-            int result = -1;
-
-            var sub = b.Subscribe(x => { result = x; });
-
-            Assert.NotNull(sub);
-
-            b.Dispose();
-            b.OnNext(2);
-
-            Assert.NotEqual(2, result);
-            Assert.Equal(-1, result);
-        }
-
-        [Fact]
-        public void AsyncBroacaster_OnCompleted()
-        {
-            var b = new AsyncBroadcaster<int>();
-            var resetEvent = new ManualResetEvent(false);
-
-            bool complete = false;
-
-            var sub = b.Subscribe(x => { }, () =>
-            {
-                complete = true;
-                resetEvent.Set();
-            });
-
-            Assert.NotNull(sub);
-
-            b.OnCompleted();
-            resetEvent.WaitOne();
-
-            Assert.True(complete);
-        }
-
-        [Fact]
-        public void AsyncBroacaster_Dispose_Does_Not_Fire_OnCompleted()
-        {
-            var b = new AsyncBroadcaster<int>();
-            var resetEvent = new ManualResetEvent(false);
-
-            int count = 0;
-
-            var sub = b.Subscribe(x => { }, () =>
-            {
-                count++;
-                resetEvent.Set();
-            });
-
-            Assert.NotNull(sub);
-
-            //Dispose will call complete once
-            b.Dispose();
-            resetEvent.WaitOne();
-
-            //ensure it's not called again
-            resetEvent.Reset();
-            b.OnCompleted();
-            resetEvent.WaitOne(200);
-
-            Assert.Equal(1, count);
-        }
-
-        [Fact]
-        public void AsyncBroacaster_Disposed_OnCompleted()
-        {
-            var b = new AsyncBroadcaster<int>();
-            var resetEvent = new ManualResetEvent(false);
-
-            bool complete = false;
-
-            var sub = b.Subscribe(x => { }, () =>
-            {
-                complete = true;
-                resetEvent.Set();
-            });
-
-            Assert.NotNull(sub);
-
-            b.Dispose();
-            resetEvent.WaitOne();
-
-            Assert.True(complete);
-        }
-
-        [Fact]
-        public void AsyncBroacaster_DisposedSubscription_OnCompleted()
-        {
-            var b = new AsyncBroadcaster<int>();
-            var resetEvent = new ManualResetEvent(false);
-
-            bool complete = false;
-
-            var sub = b.Subscribe(x => { }, () =>
-            {
-                complete = true;
-                resetEvent.Set();
-            });
-
-            Assert.NotNull(sub);
-
-            sub.Dispose();
-            resetEvent.WaitOne(200);
-
-            //disposing sub should not fire on completed
-            Assert.False(complete);
-        }
-
-        [Fact]
-        public void AsyncBroacaster_OnError_FromOnNext()
-        {
-            var b = new AsyncBroadcaster<int>();
-            var resetEvent = new ManualResetEvent(false);
-
-            var exception = new Exception("HAI");
-            Exception result = null;
-
-            var sub = b.Subscribe(x => { throw exception; }, x =>
-            {
-                result = x;
-                resetEvent.Set();
-            });
-
-            Assert.NotNull(sub);
-
-            b.OnNext(1);
-            resetEvent.WaitOne();
-
-            Assert.NotNull(result);
-
-            Assert.Equal(exception, result);
-        }
-
-        [Fact]
-        public void AsyncBroacaster_OnError_FromOnError()
-        {
-            var b = new AsyncBroadcaster<int>();
-            var resetEvent = new ManualResetEvent(false);
-
-            var exception = new Exception("HAI");
-            Exception result = null;
-
-            var sub = b.Subscribe(x => { }, x =>
-            {
-                result = x;
-                resetEvent.Set();
-            });
-
-            Assert.NotNull(sub);
-
-            b.OnError(exception);
-            resetEvent.WaitOne();
-
-            Assert.NotNull(result);
-
-            Assert.Equal(exception, result);
-        }
-
-        [Fact]
-        public void AsyncBroacaster_Disposed_Does_Not_Fire_OnError()
-        {
-            var b = new AsyncBroadcaster<int>();
-            var resetEvent = new ManualResetEvent(false);
-
-            var exception = new Exception("HAI");
-            Exception result = null;
-
-            var sub = b.Subscribe(x => { }, x =>
-            {
-                result = x;
-            });
-
-            Assert.NotNull(sub);
-
-            b.Dispose();
-            resetEvent.WaitOne(200);
-
-            b.OnError(exception);
-            resetEvent.WaitOne(200);
-
-            Assert.Null(result);
-        }
-
-
-        [Fact]
-        public void DelegateDisposable_Create()
-        {
-            int count = 0;
-            var disposable = new DelegateDisposable(() => count = 1);
-
-            Assert.NotNull(disposable);
-            Assert.IsAssignableFrom<IDisposable>(disposable);
-
-            disposable.Dispose();
-
-            Assert.Equal(1, count);
-        }
-
-        [Fact]
-        public void AsyncBroadcaster_Completed_Subscribe_Does_Not_Add_Observer()
-        {
-            var b = new AsyncBroadcaster<int>();
-            b.OnCompleted();
-
-            b.Subscribe(x => { });
-
-            Assert.True(b.IsComplete);
-            Assert.False(b.HasObservers);
-        }
-
-        [Fact]
-        public void AsyncBroadcaster_Disposed_Subscribe_Throws_Exception()
-        {
-            var b = new AsyncBroadcaster<int>();
-            b.Dispose();
-
-            Assert.True(b.IsComplete);
-            Assert.True(b.IsDisposed);
-
-            Assert.Throws<ObjectDisposedException>(() => b.Subscribe(x => { }));
-
-            Assert.False(b.HasObservers);
-        }
+        Assert.Equal(1, count);
     }
 }

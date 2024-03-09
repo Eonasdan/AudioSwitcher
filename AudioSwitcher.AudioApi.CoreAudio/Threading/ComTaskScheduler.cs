@@ -5,91 +5,90 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace AudioSwitcher.AudioApi.CoreAudio.Threading
+namespace AudioSwitcher.AudioApi.CoreAudio.Threading;
+
+internal sealed class ComTaskScheduler : TaskScheduler, IDisposable
 {
-    internal sealed class ComTaskScheduler : TaskScheduler, IDisposable
+    private readonly CancellationTokenSource _cancellationToken;
+    private readonly BlockingCollection<Task> _tasks;
+    private readonly List<Thread> _threads;
+    public readonly List<int> ThreadIds;
+
+    public ComTaskScheduler(int numberOfThreads)
     {
-        private readonly List<Thread> _threads;
-        private readonly CancellationTokenSource _cancellationToken;
-        private readonly BlockingCollection<Task> _tasks;
-        public readonly List<int> ThreadIds;
+        if (numberOfThreads < 1)
+            throw new ArgumentOutOfRangeException(nameof(numberOfThreads));
 
-        public override int MaximumConcurrencyLevel => _threads.Count;
+        // Initialize the tasks collection
+        _tasks = new BlockingCollection<Task>();
+        _cancellationToken = new CancellationTokenSource();
 
-        public ComTaskScheduler(int numberOfThreads)
+        // Create the threads to be used by this scheduler
+        _threads = Enumerable.Range(0, numberOfThreads).Select(i =>
         {
-            if (numberOfThreads < 1)
-                throw new ArgumentOutOfRangeException(nameof(numberOfThreads));
+            var thread = new Thread(ThreadStart);
+            thread.IsBackground = true;
+            thread.SetApartmentState(ApartmentState.STA);
+            return thread;
+        }).ToList();
 
-            // Initialize the tasks collection
-            _tasks = new BlockingCollection<Task>();
-            _cancellationToken = new CancellationTokenSource();
+        // Start all of the threads
+        _threads.ForEach(t => t.Start());
 
-            // Create the threads to be used by this scheduler
-            _threads = Enumerable.Range(0, numberOfThreads).Select(i =>
-            {
-                var thread = new Thread(ThreadStart);
-                thread.IsBackground = true;
-                thread.SetApartmentState(ApartmentState.STA);
-                return thread;
-            }).ToList();
+        ThreadIds = _threads.Select(x => x.ManagedThreadId).ToList();
+    }
 
-            // Start all of the threads
-            _threads.ForEach(t => t.Start());
+    public override int MaximumConcurrencyLevel => _threads.Count;
 
-            ThreadIds = _threads.Select(x => x.ManagedThreadId).ToList();
-        }
+    public void Dispose()
+    {
+        if (_cancellationToken.IsCancellationRequested)
+            return;
 
-        public void Dispose()
-        {
-            if (_cancellationToken.IsCancellationRequested)
-                return;
+        _cancellationToken.Cancel();
+        _cancellationToken.Dispose();
+        _tasks.CompleteAdding();
+        _tasks.Dispose();
+    }
 
-            _cancellationToken.Cancel();
-            _cancellationToken.Dispose();
-            _tasks.CompleteAdding();
-            _tasks.Dispose();
-        }
+    protected override IEnumerable<Task> GetScheduledTasks()
+    {
+        ThrowIfDisposed();
 
-        protected override void QueueTask(Task task)
-        {
-            ThrowIfDisposed();
+        return _tasks.ToArray();
+    }
 
-            _tasks.Add(task, _cancellationToken.Token);
-        }
+    protected override void QueueTask(Task task)
+    {
+        ThrowIfDisposed();
 
-        protected override IEnumerable<Task> GetScheduledTasks()
-        {
-            ThrowIfDisposed();
+        _tasks.Add(task, _cancellationToken.Token);
+    }
 
-            return _tasks.ToArray();
-        }
+    protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
+    {
+        ThrowIfDisposed();
 
-        protected override bool TryExecuteTaskInline(Task task, bool taskWasPreviouslyQueued)
-        {
-            ThrowIfDisposed();
+        if (!ThreadIds.Contains(Thread.CurrentThread.ManagedThreadId))
+            return false;
 
-            if (!ThreadIds.Contains(Thread.CurrentThread.ManagedThreadId))
-                return false;
+        if (_cancellationToken.Token.IsCancellationRequested)
+            return false;
 
-            if (_cancellationToken.Token.IsCancellationRequested)
-                return false;
+        return TryExecuteTask(task);
+    }
 
-            return TryExecuteTask(task);
-        }
+    private void ThreadStart()
+    {
+        var token = _cancellationToken.Token;
 
-        private void ThreadStart()
-        {
-            var token = _cancellationToken.Token;
+        foreach (var task in _tasks.GetConsumingEnumerable(token))
+            TryExecuteTask(task);
+    }
 
-            foreach (var task in _tasks.GetConsumingEnumerable(token))
-                TryExecuteTask(task);
-        }
-
-        private void ThrowIfDisposed()
-        {
-            if (_cancellationToken.IsCancellationRequested || _tasks.IsAddingCompleted)
-                throw new ObjectDisposedException(typeof(ComTaskScheduler).Name);
-        }
+    private void ThrowIfDisposed()
+    {
+        if (_cancellationToken.IsCancellationRequested || _tasks.IsAddingCompleted)
+            throw new ObjectDisposedException(typeof(ComTaskScheduler).Name);
     }
 }

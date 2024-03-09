@@ -2,148 +2,141 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace AudioSwitcher.AudioApi.Observables
+namespace AudioSwitcher.AudioApi.Observables;
+
+public class Broadcaster<T> : BroadcasterBase<T>
 {
-    public class Broadcaster<T> : BroadcasterBase<T>
+    private readonly object _observerLock = new();
+    private readonly HashSet<IObserver<T>> _observers;
+    private bool _isComplete;
+
+    public Broadcaster()
     {
-        private readonly object _observerLock = new object();
-        private readonly HashSet<IObserver<T>> _observers;
-        private bool _isComplete;
+        _observers = new HashSet<IObserver<T>>();
+    }
 
-        public override bool HasObservers
+    public override bool HasObservers
+    {
+        get
         {
-            get
-            {
-                lock (_observerLock)
-                {
-                    return _observers.Count > 0;
-                }
-            }
-        }
-
-        public override bool IsComplete => _isComplete;
-
-        public Broadcaster()
-        {
-            _observers = new HashSet<IObserver<T>>();
-        }
-
-        public override void OnNext(T value)
-        {
-            if (IsDisposed || IsComplete)
-                return;
-
-            IEnumerable<IObserver<T>> coll;
             lock (_observerLock)
             {
-                coll = _observers.ToList();
-            }
-
-            foreach (var observer in coll)
-            {
-                try
-                {
-                    observer.OnNext(value);
-                }
-                catch (Exception ex)
-                {
-                    try
-                    {
-                        observer.OnError(ex);
-                    }
-                    catch
-                    {
-                        //ignored, should not impact other observers
-                    }
-                }
+                return _observers.Count > 0;
             }
         }
+    }
 
-        public override void OnError(Exception error)
+    public override bool IsComplete => _isComplete;
+
+    public override void OnCompleted()
+    {
+        if (IsDisposed || IsComplete)
+            return;
+
+        IEnumerable<IObserver<T>> coll;
+        lock (_observerLock)
         {
-            if (IsDisposed)
-                return;
-
-            IEnumerable<IObserver<T>> coll;
-            lock (_observerLock)
-            {
-                coll = _observers.ToList();
-            }
-
-            foreach (var observer in coll)
-            {
-                try
-                {
-                    observer.OnError(error);
-                }
-                catch
-                {
-                    //ignored, should not impact other observers
-                }
-            }
+            coll = _observers.ToList();
         }
 
-        public override void OnCompleted()
-        {
-            if (IsDisposed || IsComplete)
-                return;
-
-            IEnumerable<IObserver<T>> coll;
-            lock (_observerLock)
-            {
-                coll = _observers.ToList();
-            }
-
-            foreach (var observer in coll)
-            {
-                try
-                {
-                    observer.OnCompleted();
-                }
-                catch
-                {
-                    //ignored, should not impact other observers
-                }
-            }
-
-            _isComplete = true;
-        }
-
-        public override IDisposable Subscribe(IObserver<T> observer)
-        {
-            if (IsDisposed)
-                throw new ObjectDisposedException("Observable is disposed");
-
-            if (IsComplete)
+        foreach (var observer in coll)
+            try
             {
                 observer.OnCompleted();
-                return Disposable.Empty;
             }
-
-            lock (_observerLock)
+            catch
             {
-                _observers.Add(observer);
+                //ignored, should not impact other observers
             }
 
-            return new DelegateDisposable(() => { ObserverDisposal(observer); });
+        _isComplete = true;
+    }
+
+    public override void OnError(Exception error)
+    {
+        if (IsDisposed)
+            return;
+
+        IEnumerable<IObserver<T>> coll;
+        lock (_observerLock)
+        {
+            coll = _observers.ToList();
         }
 
-        protected virtual void ObserverDisposal(IObserver<T> observer)
-        {
-            lock (_observerLock)
+        foreach (var observer in coll)
+            try
             {
-                _observers.Remove(observer);
+                observer.OnError(error);
             }
+            catch
+            {
+                //ignored, should not impact other observers
+            }
+    }
+
+    public override void OnNext(T value)
+    {
+        if (IsDisposed || IsComplete)
+            return;
+
+        IEnumerable<IObserver<T>> coll;
+        lock (_observerLock)
+        {
+            coll = _observers.ToList();
         }
 
-        protected override void Dispose(bool disposing)
-        {
-            OnCompleted();
-
-            lock (_observerLock)
+        foreach (var observer in coll)
+            try
             {
-                _observers.Clear();
+                observer.OnNext(value);
             }
+            catch (Exception ex)
+            {
+                try
+                {
+                    observer.OnError(ex);
+                }
+                catch
+                {
+                    //ignored, should not impact other observers
+                }
+            }
+    }
+
+    public override IDisposable Subscribe(IObserver<T> observer)
+    {
+        if (IsDisposed)
+            throw new ObjectDisposedException("Observable is disposed");
+
+        if (IsComplete)
+        {
+            observer.OnCompleted();
+            return Disposable.Empty;
+        }
+
+        lock (_observerLock)
+        {
+            _observers.Add(observer);
+        }
+
+        return new DelegateDisposable(() => { ObserverDisposal(observer); });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        OnCompleted();
+
+        lock (_observerLock)
+        {
+            _observers.Clear();
+        }
+    }
+
+    protected virtual void ObserverDisposal(IObserver<T> observer)
+    {
+        lock (_observerLock)
+        {
+            _observers.Remove(observer);
         }
     }
 }

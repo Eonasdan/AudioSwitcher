@@ -6,255 +6,235 @@ using AudioSwitcher.AudioApi.Observables;
 using AudioSwitcher.AudioApi.Session;
 using Xunit;
 
-namespace AudioSwitcher.AudioApi.CoreAudio.Tests
+namespace AudioSwitcher.AudioApi.CoreAudio.Tests;
+
+[Collection("CoreAudio_Session")]
+public class SessionTests
 {
-    [Collection("CoreAudio_Session")]
-    public class SessionTests
+    [Fact]
+    public async Task CoreAudioSession_Can_Subscribe_To_MuteChanged()
     {
-
-        [Fact]
-        public void CoreAudioSessionController_Exists_As_Capability()
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                Assert.NotNull(device.GetCapability<IAudioSessionController>());
-            }
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
+
+            var sub = session.MuteChanged.Subscribe(x => { });
+
+            sub.Dispose();
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_IsMuted_When_Device_Is_Muted()
+    [Fact]
+    public async Task CoreAudioSession_Can_Subscribe_To_PeakValueChanged()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var oldDMute = device.IsMuted;
-                var oldSMute = session.IsMuted;
+            var sub = session.PeakValueChanged.Subscribe(x => { });
 
-                await session.SetMuteAsync(false);
-                await device.SetMuteAsync(true);
-
-                Assert.True(session.IsMuted);
-
-                await device.SetMuteAsync(oldDMute);
-                await session.SetMuteAsync(oldSMute);
-            }
+            sub.Dispose();
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_SetMute_True()
+    [Fact]
+    public async Task CoreAudioSession_Can_Subscribe_To_StateChanged()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var oldDMute = device.IsMuted;
-                var oldSMute = session.IsMuted;
+            var sub = session.StateChanged.Subscribe(x => { });
 
-                await device.SetMuteAsync(false);
-                await session.SetMuteAsync(true);
-
-                Assert.True(session.IsMuted);
-
-                await device.SetMuteAsync(oldDMute);
-                await session.SetMuteAsync(oldSMute);
-            }
+            sub.Dispose();
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_SetMute_False()
+    [Fact]
+    public async Task CoreAudioSession_Can_Subscribe_To_VolumeChanged()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var oldDMute = device.IsMuted;
-                var oldSMute = session.IsMuted;
+            var sub = session.VolumeChanged.Subscribe(x => { });
 
-                await device.SetMuteAsync(false);
-                await session.SetMuteAsync(false);
-
-                Assert.False(session.IsMuted);
-
-                await device.SetMuteAsync(oldDMute);
-                await session.SetMuteAsync(oldSMute);
-            }
+            sub.Dispose();
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_SetVolume_Zero()
+    [Fact]
+    public async Task CoreAudioSession_IsMuted_When_Device_Is_Muted()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var oldVol = session.Volume;
+            var oldDMute = device.IsMuted;
+            var oldSMute = session.IsMuted;
 
-                await session.SetVolumeAsync(-1);
+            await session.SetMuteAsync(false);
+            await device.SetMuteAsync(true);
 
-                Assert.Equal(0, session.Volume);
+            Assert.True(session.IsMuted);
 
-                await session.SetVolumeAsync(oldVol);
-            }
+            await device.SetMuteAsync(oldDMute);
+            await session.SetMuteAsync(oldSMute);
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_SetVolume_Greater_Than_100()
+    [Fact]
+    public async Task CoreAudioSession_SetMute_False()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var oldVol = session.Volume;
+            var oldDMute = device.IsMuted;
+            var oldSMute = session.IsMuted;
 
-                await session.SetVolumeAsync(110);
+            await device.SetMuteAsync(false);
+            await session.SetMuteAsync(false);
 
-                Assert.Equal(100, session.Volume);
+            Assert.False(session.IsMuted);
 
-                await session.SetVolumeAsync(oldVol);
-            }
+            await device.SetMuteAsync(oldDMute);
+            await session.SetMuteAsync(oldSMute);
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_SetVolume_Valid_value()
+    [Fact]
+    public async Task CoreAudioSession_SetMute_Raises_Event()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var oldVol = session.Volume;
+            var oldMute = session.IsMuted;
+            var resetEvent = new ManualResetEvent(false);
 
-                await session.SetVolumeAsync(60);
+            session.MuteChanged.Subscribe(x => { resetEvent.Set(); });
 
-                Assert.Equal(60, Math.Round(session.Volume, 0));
+            await session.SetMuteAsync(false);
+            await session.SetMuteAsync(true);
 
-                await session.SetVolumeAsync(oldVol);
-            }
+            resetEvent.WaitOne();
+
+            await session.SetMuteAsync(oldMute);
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_SetVolume_Raises_Event()
+    [Fact]
+    public async Task CoreAudioSession_SetMute_True()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var oldVol = session.Volume;
-                var resetEvent = new ManualResetEvent(false);
+            var oldDMute = device.IsMuted;
+            var oldSMute = session.IsMuted;
 
-                session.VolumeChanged.Subscribe(x =>
-                {
-                    resetEvent.Set();
-                });
+            await device.SetMuteAsync(false);
+            await session.SetMuteAsync(true);
 
-                await session.SetVolumeAsync(60);
-                await session.SetVolumeAsync(50);
+            Assert.True(session.IsMuted);
 
-                resetEvent.WaitOne();
-
-                await session.SetVolumeAsync(oldVol);
-            }
+            await device.SetMuteAsync(oldDMute);
+            await session.SetMuteAsync(oldSMute);
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_SetMute_Raises_Event()
+    [Fact]
+    public async Task CoreAudioSession_SetVolume_Greater_Than_100()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var oldMute = session.IsMuted;
-                var resetEvent = new ManualResetEvent(false);
+            var oldVol = session.Volume;
 
-                session.MuteChanged.Subscribe(x =>
-                {
-                    resetEvent.Set();
-                });
+            await session.SetVolumeAsync(110);
 
-                await session.SetMuteAsync(false);
-                await session.SetMuteAsync(true);
+            Assert.Equal(100, session.Volume);
 
-                resetEvent.WaitOne();
-
-                await session.SetMuteAsync(oldMute);
-            }
+            await session.SetVolumeAsync(oldVol);
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_Can_Subscribe_To_PeakValueChanged()
+    [Fact]
+    public async Task CoreAudioSession_SetVolume_Raises_Event()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var sub = session.PeakValueChanged.Subscribe(x =>
-                {
-                    
-                });
+            var oldVol = session.Volume;
+            var resetEvent = new ManualResetEvent(false);
 
-                sub.Dispose();
-            }
+            session.VolumeChanged.Subscribe(x => { resetEvent.Set(); });
+
+            await session.SetVolumeAsync(60);
+            await session.SetVolumeAsync(50);
+
+            resetEvent.WaitOne();
+
+            await session.SetVolumeAsync(oldVol);
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_Can_Subscribe_To_MuteChanged()
+    [Fact]
+    public async Task CoreAudioSession_SetVolume_Valid_value()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var sub = session.MuteChanged.Subscribe(x =>
-                {
+            var oldVol = session.Volume;
 
-                });
+            await session.SetVolumeAsync(60);
 
-                sub.Dispose();
-            }
+            Assert.Equal(60, Math.Round(session.Volume, 0));
+
+            await session.SetVolumeAsync(oldVol);
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_Can_Subscribe_To_StateChanged()
+    [Fact]
+    public async Task CoreAudioSession_SetVolume_Zero()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
+            var device = controller.DefaultPlaybackDevice;
+            var session = device.GetCapability<IAudioSessionController>().First();
 
-                var sub = session.StateChanged.Subscribe(x =>
-                {
+            var oldVol = session.Volume;
 
-                });
+            await session.SetVolumeAsync(-1);
 
-                sub.Dispose();
-            }
+            Assert.Equal(0, session.Volume);
+
+            await session.SetVolumeAsync(oldVol);
         }
+    }
 
-        [Fact]
-        public async Task CoreAudioSession_Can_Subscribe_To_VolumeChanged()
+    [Fact]
+    public void CoreAudioSessionController_Exists_As_Capability()
+    {
+        using (var controller = new CoreAudioController())
         {
-            using (var controller = new CoreAudioController())
-            {
-                var device = controller.DefaultPlaybackDevice;
-                var session = device.GetCapability<IAudioSessionController>().First();
-
-                var sub = session.VolumeChanged.Subscribe(x =>
-                {
-
-                });
-
-                sub.Dispose();
-            }
+            var device = controller.DefaultPlaybackDevice;
+            Assert.NotNull(device.GetCapability<IAudioSessionController>());
         }
     }
 }

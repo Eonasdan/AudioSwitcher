@@ -1,6 +1,5 @@
-﻿namespace AudioSwitcher.AudioApi.Tests
+﻿namespace AudioSwitcher.AudioApi.Tests;
+
+public partial class DeviceTests
 {
-    public partial class DeviceTests
-    {
-    }
 }

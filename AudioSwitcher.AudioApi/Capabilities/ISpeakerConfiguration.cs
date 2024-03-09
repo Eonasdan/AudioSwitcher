@@ -1,11 +1,9 @@
-﻿namespace AudioSwitcher.AudioApi.Capabilities
+﻿namespace AudioSwitcher.AudioApi.Capabilities;
+
+public interface ISpeakerConfiguration : IDeviceCapability
 {
-    public interface ISpeakerConfiguration : IDeviceCapability
-    {
-        bool IsSupported(SpeakerConfiguration configuration);
+    SpeakerConfiguration Get();
+    bool IsSupported(SpeakerConfiguration configuration);
 
-        SpeakerConfiguration Get();
-
-        void Set(SpeakerConfiguration configuration);
-    }
+    void Set(SpeakerConfiguration configuration);
 }

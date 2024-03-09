@@ -5,42 +5,37 @@ using System.Linq;
 using System.Timers;
 using AudioSwitcher.AudioApi.Observables;
 
-namespace AudioSwitcher.AudioApi.CoreAudio
+namespace AudioSwitcher.AudioApi.CoreAudio;
+
+internal static class ProcessMonitor
 {
-    internal static class ProcessMonitor
+    private static readonly Timer _processExitTimer;
+    private static readonly Broadcaster<int> _processTerminated;
+    private static IEnumerable<int> _lastProcesses = new List<int>();
+
+    static ProcessMonitor()
     {
-
-        private static readonly Timer _processExitTimer;
-        private static readonly Broadcaster<int> _processTerminated;
-        private static IEnumerable<int> _lastProcesses = new List<int>();
-
-        public static IObservable<int> ProcessTerminated => _processTerminated.AsObservable();
-
-        static ProcessMonitor()
+        _processTerminated = new Broadcaster<int>();
+        _processExitTimer = new Timer
         {
-            _processTerminated = new Broadcaster<int>();
-            _processExitTimer = new Timer
-            {
-                Interval = 1500,
-                AutoReset = false
-            };
+            Interval = 1500,
+            AutoReset = false
+        };
 
-            _processExitTimer.Elapsed += TimerTick;
-            _processExitTimer.Start();
-        }
+        _processExitTimer.Elapsed += TimerTick;
+        _processExitTimer.Start();
+    }
 
-        private static void TimerTick(object sender, ElapsedEventArgs e)
-        {
-            var processIds = Process.GetProcesses().Select(x => x.Id).ToList();
+    public static IObservable<int> ProcessTerminated => _processTerminated.AsObservable();
 
-            foreach (var removedProcess in _lastProcesses.Except(processIds))
-            {
-                _processTerminated.OnNext(removedProcess);
-            }
+    private static void TimerTick(object sender, ElapsedEventArgs e)
+    {
+        var processIds = Process.GetProcesses().Select(x => x.Id).ToList();
 
-            _lastProcesses = processIds;
+        foreach (var removedProcess in _lastProcesses.Except(processIds)) _processTerminated.OnNext(removedProcess);
 
-            _processExitTimer?.Start();
-        }
+        _lastProcesses = processIds;
+
+        _processExitTimer?.Start();
     }
 }

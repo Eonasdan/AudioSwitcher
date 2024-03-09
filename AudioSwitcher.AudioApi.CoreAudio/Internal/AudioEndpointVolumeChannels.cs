@@ -24,54 +24,46 @@ using System.Runtime.InteropServices;
 using AudioSwitcher.AudioApi.CoreAudio.Interfaces;
 using AudioSwitcher.AudioApi.CoreAudio.Threading;
 
-namespace AudioSwitcher.AudioApi.CoreAudio
+namespace AudioSwitcher.AudioApi.CoreAudio;
+
+/// <summary>
+/// Audio Endpoint VolumeChanged Channels
+/// </summary>
+internal class AudioEndpointVolumeChannels
 {
-    /// <summary>
-    ///     Audio Endpoint VolumeChanged Channels
-    /// </summary>
-    internal class AudioEndpointVolumeChannels
+    private readonly IAudioEndpointVolume _audioEndPointVolume;
+    private readonly AudioEndpointVolumeChannel[] _channels;
+
+    internal AudioEndpointVolumeChannels(IAudioEndpointVolume parent)
     {
-        private readonly IAudioEndpointVolume _audioEndPointVolume;
-        private readonly AudioEndpointVolumeChannel[] _channels;
+        ComThread.Assert();
+        _audioEndPointVolume = parent;
 
-        /// <summary>
-        ///     Channel Count
-        /// </summary>
-        public int Count
+        var channelCount = Count;
+        _channels = new AudioEndpointVolumeChannel[channelCount];
+        for (var i = 0; i < channelCount; i++) _channels[i] = new AudioEndpointVolumeChannel(_audioEndPointVolume, i);
+    }
+
+    /// <summary>
+    /// Channel Count
+    /// </summary>
+    public int Count
+    {
+        get
         {
-            get
+            return ComThread.Invoke(() =>
             {
-                return ComThread.Invoke(() =>
-                {
-                    int result;
-                    Marshal.ThrowExceptionForHR(_audioEndPointVolume.GetChannelCount(out result));
-                    return result;
-                });
-            }
+                Marshal.ThrowExceptionForHR(_audioEndPointVolume.GetChannelCount(out var result));
+                return result;
+            });
         }
+    }
 
-        /// <summary>
-        ///     Indexer - get a specific channel
-        /// </summary>
-        public AudioEndpointVolumeChannel this[int index]
-        {
-            get
-            {
-                return ComThread.Invoke(() => _channels[index]);
-            }
-        }
-
-        internal AudioEndpointVolumeChannels(IAudioEndpointVolume parent)
-        {
-            ComThread.Assert();
-            _audioEndPointVolume = parent;
-
-            var channelCount = Count;
-            _channels = new AudioEndpointVolumeChannel[channelCount];
-            for (var i = 0; i < channelCount; i++)
-            {
-                _channels[i] = new AudioEndpointVolumeChannel(_audioEndPointVolume, i);
-            }
-        }
+    /// <summary>
+    /// Indexer - get a specific channel
+    /// </summary>
+    public AudioEndpointVolumeChannel this[int index]
+    {
+        get { return ComThread.Invoke(() => _channels[index]); }
     }
 }

@@ -2,163 +2,124 @@
 using AudioSwitcher.AudioApi.Observables;
 using Xunit;
 
-namespace AudioSwitcher.AudioApi.Tests
+namespace AudioSwitcher.AudioApi.Tests;
+
+public class DelegateObserverTests
 {
-    public class DelegateObserverTests
+    [Fact]
+    public void DelegateObserver_Constructor_Throws_For_Null_OnComplete()
     {
+        Assert.Throws<ArgumentNullException>(() => new Broadcaster<int>().Subscribe(x => { }, onCompleted: null));
+    }
 
-        [Fact]
-        public void DelegateObserver_Constructor_Throws_For_Null_OnNext()
-        {
-            Assert.Throws<ArgumentNullException>(() => new Broadcaster<int>().Subscribe(onNext: null));
-        }
+    [Fact]
+    public void DelegateObserver_Constructor_Throws_For_Null_OnError()
+    {
+        Assert.Throws<ArgumentNullException>(() => new Broadcaster<int>().Subscribe(x => { }, null, () => { }));
+    }
 
-        [Fact]
-        public void DelegateObserver_Constructor_Throws_For_Null_OnComplete()
-        {
-            Assert.Throws<ArgumentNullException>(() => new Broadcaster<int>().Subscribe(x => { }, onCompleted: null));
-        }
+    [Fact]
+    public void DelegateObserver_Constructor_Throws_For_Null_OnNext()
+    {
+        Assert.Throws<ArgumentNullException>(() => new Broadcaster<int>().Subscribe(onNext: null));
+    }
 
-        [Fact]
-        public void DelegateObserver_Constructor_Throws_For_Null_OnError()
-        {
-            Assert.Throws<ArgumentNullException>(() => new Broadcaster<int>().Subscribe(x => { }, null, () => { }));
-        }
+    [Fact]
+    public void DelegateObserver_Disposed_Does_Not_Fire_OnComplete()
+    {
+        var b = new Broadcaster<int>();
+        var result = 0;
 
-        [Fact]
-        public void DelegateObserver_Disposed_Does_Not_Send_OnNext()
-        {
-            int result = -1;
+        var sub = b.Subscribe(x => { }, () => { result = 5; });
 
-            var b = new DelegateObserver<int>(
-                i =>
-                {
-                    result = 1;
-                },
-                exception =>
-                {
+        sub.Dispose();
 
-                },
-                () =>
-                {
+        b.OnCompleted();
 
-                });
+        Assert.Equal(0, result);
+    }
 
-            b.Dispose();
+    [Fact]
+    public void DelegateObserver_Disposed_Does_Not_Fire_OnError()
+    {
+        var b = new Broadcaster<int>();
+        var result = 0;
 
-            Assert.True(b.IsDisposed);
-            Assert.Equal(-1, result);
-        }
+        var sub = b.Subscribe(x => { }, x => { result = 5; });
 
-        [Fact]
-        public void DelegateObserver_Disposed_Does_Not_Send_OnError()
-        {
-            int result = -1;
+        sub.Dispose();
 
-            var b = new DelegateObserver<int>(
-                i =>
-                {
-                },
-                exception =>
-                {
-                    result = 1;
-                },
-                () =>
-                {
+        b.OnError(new Exception());
 
-                });
+        Assert.Equal(0, result);
+    }
 
-            b.Dispose();
+    [Fact]
+    public void DelegateObserver_Disposed_Does_Not_Fire_OnNext()
+    {
+        var b = new Broadcaster<int>();
+        var result = 0;
 
-            Assert.True(b.IsDisposed);
-            Assert.Equal(-1, result);
-        }
+        var sub = b.Subscribe(x => { result = x; });
 
-        [Fact]
-        public void DelegateObserver_Disposed_Does_Not_Send_OnComplete()
-        {
-            int result = -1;
+        sub.Dispose();
 
-            var b = new DelegateObserver<int>(
-                i =>
-                {
-                },
-                exception =>
-                {
-                },
-                () =>
-                {
-                    result = 1;
-                });
+        b.OnNext(5);
 
-            b.Dispose();
+        Assert.Equal(0, result);
+    }
 
-            Assert.True(b.IsDisposed);
-            Assert.Equal(-1, result);
-        }
+    [Fact]
+    public void DelegateObserver_Disposed_Does_Not_Send_OnComplete()
+    {
+        var result = -1;
 
-        [Fact]
-        public void DelegateObserver_Disposed_Does_Not_Fire_OnNext()
-        {
-            var b = new Broadcaster<int>();
-            int result = 0;
+        var b = new DelegateObserver<int>(
+            i => { },
+            exception => { },
+            () => { result = 1; });
 
-            var sub = b.Subscribe(x =>
-            {
-                result = x;
-            });
+        b.Dispose();
 
-            sub.Dispose();
+        Assert.True(b.IsDisposed);
+        Assert.Equal(-1, result);
+    }
 
-            b.OnNext(5);
+    [Fact]
+    public void DelegateObserver_Disposed_Does_Not_Send_OnError()
+    {
+        var result = -1;
 
-            Assert.Equal(0, result);
-        }
+        var b = new DelegateObserver<int>(
+            i => { },
+            exception => { result = 1; },
+            () => { });
 
-        [Fact]
-        public void DelegateObserver_Disposed_Does_Not_Fire_OnComplete()
-        {
-            var b = new Broadcaster<int>();
-            int result = 0;
+        b.Dispose();
 
-            var sub = b.Subscribe(x => { }, () =>
-              {
-                  result = 5;
-              });
+        Assert.True(b.IsDisposed);
+        Assert.Equal(-1, result);
+    }
 
-            sub.Dispose();
+    [Fact]
+    public void DelegateObserver_Disposed_Does_Not_Send_OnNext()
+    {
+        var result = -1;
 
-            b.OnCompleted();
+        var b = new DelegateObserver<int>(
+            i => { result = 1; },
+            exception => { },
+            () => { });
 
-            Assert.Equal(0, result);
-        }
+        b.Dispose();
 
-        [Fact]
-        public void DelegateObserver_Disposed_Does_Not_Fire_OnError()
-        {
-            var b = new Broadcaster<int>();
-            int result = 0;
+        Assert.True(b.IsDisposed);
+        Assert.Equal(-1, result);
+    }
 
-            var sub = b.Subscribe(x => { }, x =>
-            {
-                result = 5;
-            });
-
-            sub.Dispose();
-
-            b.OnError(new Exception());
-
-            Assert.Equal(0, result);
-        }
-
-        [Fact]
-        public void Observable_AsObservable_Null_Throws_Exception()
-        {
-            Assert.Throws<ArgumentNullException>(() =>
-            {
-                (null as IObservable<int>).AsObservable();
-            });
-        }
-
+    [Fact]
+    public void Observable_AsObservable_Null_Throws_Exception()
+    {
+        Assert.Throws<ArgumentNullException>(() => { (null as IObservable<int>).AsObservable(); });
     }
 }
